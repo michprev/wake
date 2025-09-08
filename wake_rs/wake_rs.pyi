@@ -4,7 +4,7 @@ from os import PathLike
 from typing import Dict, List, Sequence, Union, Optional, Any, Callable, Type, Tuple
 from typing_extensions import Literal
 
-from wake.development.core import Chain, SignedAuthorization, TransactionAbc, TxParams, Eip712Domain
+from wake.development.core import SignedAuthorization, TransactionAbc, TxParams, Eip712Domain
 from wake.development.primitive_types import bytes32
 
 
@@ -292,6 +292,11 @@ class Contract(Account):
 
 class Library(Contract):
     pass
+
+class Chain:
+
+    def load_rng(self, rng: bytes) -> None: ...
+    def dump_rng(self) -> bytes: ...
 
 
 def encode_eip712_type(obj) -> str: ...
