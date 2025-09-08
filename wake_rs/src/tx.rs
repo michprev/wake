@@ -409,6 +409,10 @@ impl TransactionAbc {
 
         Ok(tmp)
     }
+
+    fn __deepcopy__<'py>(slf: &Bound<'py, Self>, _memo: Option<Py<PyAny>>) -> Bound<'py, Self> {
+        slf.clone()
+    }
 }
 
 #[pyclass(extends=TransactionAbc)]

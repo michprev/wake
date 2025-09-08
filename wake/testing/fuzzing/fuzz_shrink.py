@@ -36,6 +36,7 @@ from wake.development.globals import (
 from wake.development.transactions import Error, Panic
 from wake.testing.core import chain as global_default_chain
 from wake.utils.file_utils import is_relative_to
+from wake_rs import wake_rs
 
 from ..core import get_connected_chains
 from .fuzz_test import FuzzTest
@@ -158,6 +159,7 @@ class StateSnapShot:
         self._python_state = None
         self.chain_states = []
         self.flow_number = None
+        self.chain_random_states = None
 
     def take_snapshot(
         self,
@@ -185,9 +187,16 @@ class StateSnapShot:
         self._python_state = new_instance
 
         self.flow_number = python_instance._flow_num
-        self._python_state.__dict__.update(copy.deepcopy(python_instance.__dict__))
+        self._python_state = copy.deepcopy(python_instance)
         self.chain_states = [chain.snapshot() for chain in chains]
+        # assert isinstance(global_default_chain, Chain) #
         self.default_chain = global_default_chain
+
+        chain_random_states_list: list[bytes] = []
+        for chain in chains:
+            if isinstance(chain, wake_rs.Chain):
+                chain_random_states_list.append(chain.dump_rng())
+        self.chain_random_states = tuple(chain_random_states_list)
         self.random_state = random_state
 
     def revert(
@@ -211,9 +220,14 @@ class StateSnapShot:
         if with_random_state:
             assert self.random_state is not None, "Random state is missing"
             random.setstate(self.random_state)
+            assert self.chain_random_states is not None, "Chain random states are missing"
+            for chain, chain_random_state in zip(chains, self.chain_random_states):
+                if chain_random_state is not None:
+                    assert isinstance(chain, wake_rs.Chain)
+                    chain.load_rng(chain_random_state)
         global_default_chain = self.default_chain
 
-
+# Exception to detect if the flow is over run.
 class OverRunException(Exception):
     def __init__(self):
         super().__init__("Overrun")
@@ -222,6 +236,7 @@ class OverRunException(Exception):
 @dataclass
 class ReproducibleFlowState:
     random_state: tuple[int, tuple[int, ...], float | None]
+    chain_random_states: tuple[bytes, ...]
     flow_num: int
     flow_name: str
     flow_params: List[Any]
@@ -229,6 +244,7 @@ class ReproducibleFlowState:
     def to_dict(self):
         return {
             "random_state": serialize_random_state(self.random_state),
+            "chain_random_states": [state.hex() for state in self.chain_random_states],
             "flow_num": self.flow_num,
             "flow_name": self.flow_name,
             "flow_params": self.flow_params,
@@ -238,6 +254,7 @@ class ReproducibleFlowState:
     def from_dict(cls, data):
         return cls(
             random_state=deserialize_random_state(data["random_state"]),
+            chain_random_states=tuple(bytes.fromhex(state) for state in data["chain_random_states"]),
             flow_num=data["flow_num"],
             flow_name=data["flow_name"],
             flow_params=data["flow_params"],
@@ -299,12 +316,15 @@ def fuzz_shrink(
     assert issubclass(test_class, FuzzTest)
     fuzz_mode = get_fuzz_mode()
     if fuzz_mode == 0:
+        ## normal fuzzing
         set_is_fuzzing(True)
         single_fuzz_test(test_class, sequences_count, flows_count, dry_run)
         set_is_fuzzing(False)
     elif fuzz_mode == 1:
+        ## shrinking
         shrink_test(test_class, flows_count)
     elif fuzz_mode == 2:
+        ## reproduced from shrunk data
         shrank_reproduce(test_class, dry_run)
     else:
         raise Exception("Invalid fuzz mode")
@@ -316,6 +336,7 @@ def shrank_reproduce(test_class: type[FuzzTest], dry_run: bool = False):
     flows: List[Callable] = __get_methods(test_instance, "flow")
     invariants: List[Callable] = __get_methods(test_instance, "invariant")
     shrank_path = get_shrank_path()
+    chains = get_connected_chains()
     if shrank_path is None:
         raise Exception("Shrunken data file path not found")
     # read shrank json file
@@ -349,6 +370,10 @@ def shrank_reproduce(test_class: type[FuzzTest], dry_run: bool = False):
             test_instance
         ):
             random.setstate(store_data.required_flows[j].random_state)
+            for chain, chain_random_state in zip(chains, store_data.required_flows[j].chain_random_states):
+                if chain_random_state is not None:
+                    assert isinstance(chain, wake_rs.Chain)
+                    chain.load_rng(chain_random_state)
             test_instance.pre_flow(flow)
             flow(test_instance, *flow_params)
             test_instance.post_flow(flow)
@@ -384,6 +409,10 @@ def shrink_collecting_phase(
     # Snapshot all connected chains
     initial_chain_state_snapshots = [chain.snapshot() for chain in chains]
     random.setstate(initial_state)
+    exception = None
+
+
+
     with print_ignore():
         test_instance._flow_num = 0
         test_instance.pre_sequence()
@@ -431,10 +460,17 @@ def shrink_collecting_phase(
                     if k != "return"
                 ]
 
+                chain_random_states: tuple[bytes, ...] = ()
+
+                for chain in chains:
+                    if isinstance(chain, wake_rs.Chain):
+                        chain_random_states += (chain.dump_rng(),)
+
                 random_state = random.getstate()
                 flow_states.append(
                     FlowState(
                         random_state=random_state,
+                        chain_random_states=chain_random_states,
                         flow_name=flow.__name__,
                         flow_params=flow_params,
                         flow_num=j,
@@ -600,6 +636,15 @@ def shrink_test(test_class: type[FuzzTest], flows_count: int):
 
                     curr_flow_state = flow_states[j]
                     random.setstate(curr_flow_state.random_state)
+
+                    # This redundancy caused by wake_rs Chain class and core.Chain class existance.
+                    for chain, chain_random_state in zip(chains, curr_flow_state.chain_random_states):
+                        if chain_random_state is not None:
+                            if not isinstance(chain, wake_rs.Chain):
+                                raise Exception("chain must be wake_rs.Chain")
+
+                            chain.load_rng(chain_random_state)
+
                     flow = curr_flow_state.flow
                     flow_params = curr_flow_state.flow_params
                     test_instance._flow_num = j
@@ -734,6 +779,15 @@ def shrink_test(test_class: type[FuzzTest], flows_count: int):
 
                     curr_flow_state = flow_states[j]
                     random.setstate(curr_flow_state.random_state)
+
+                    # This redundancy caused by wake_rs Chain class and core.Chain class existance.
+                    for chain, chain_random_state in zip(chains, curr_flow_state.chain_random_states):
+                        if chain_random_state is not None:
+                            if not isinstance(chain, wake_rs.Chain):
+                                raise Exception("chain must be wake_rs.Chain")
+
+                            chain.load_rng(chain_random_state)
+
                     flow = curr_flow_state.flow
                     flow_params = curr_flow_state.flow_params
 
