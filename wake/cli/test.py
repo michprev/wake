@@ -137,6 +137,25 @@ class FileAndPassParamType(click.ParamType):
     default=None,
     required=False,
 )
+@click.option(
+    "--mutate",
+    is_flag=True,
+    default=False,
+    help="Run mutation testing instead of standard tests.",
+)
+@click.option(
+    "--contracts",
+    multiple=True,
+    type=str,
+    help="Contract files or patterns to mutate (repeatable).",
+)
+@click.option(
+    "--tests",
+    multiple=True,
+    type=str,
+    help="Unit test files or patterns to run (repeatable).",
+)
+
 @click.argument("paths_or_pytest_args", nargs=-1, type=FileAndPassParamType())
 @click.pass_context
 def run_test(
@@ -155,6 +174,9 @@ def run_test(
     shrink_exact_exception: bool,
     shrink_target_invariants_only: bool,
     shrank: Optional[str],
+    mutate: bool,
+    contracts: Tuple[str, ...],
+    tests: Tuple[str, ...],
     paths_or_pytest_args: Tuple[str, ...],
 ) -> None:
     """Execute Wake tests using pytest."""
@@ -169,6 +191,14 @@ def run_test(
         proc_count = os.cpu_count()
     if coverage == -1:
         coverage = proc_count or 1
+
+    if mutate:
+        contracts_list = list(contracts)
+        tests_list = list(tests)
+        from wake.testing.mutation_test import run_mutation_test
+
+        run_mutation_test(contracts_list, tests_list)
+        return
 
     if coverage > (proc_count or 1):
         raise click.BadParameter(
