@@ -16,6 +16,7 @@ from .console import console
 from .detect import run_detect
 from .init import run_init
 from .lsp import run_lsp
+from .mutate import run_mutate
 from .open import run_open
 from .print import run_print
 from .run import run_run
@@ -232,6 +233,7 @@ main.add_command(run_print)
 main.add_command(run_run)
 main.add_command(run_svm)
 main.add_command(run_test)
+main.add_command(run_mutate)
 
 
 @main.command(name="config")
