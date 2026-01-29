@@ -11,3 +11,9 @@ from .boolean_flip import BooleanFlipMutator
 from .require_removal import RequireRemoval
 from .and_for_or_replacement import AndForOrReplacement
 from .or_for_and_replacement import OrForAndReplacement
+from .receive_fallback_removal import ReceiveFallbackRemoval
+from .revert_message_removal import RevertMessageRemoval
+from .revert_error_removal import RevertErrorRemoval
+from .payable_removal import PayableRemoval
+from .public_external_replacement import PublicExternalReplacement
+from .external_public_replacement import ExternalPublicReplacement
