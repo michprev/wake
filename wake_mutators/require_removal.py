@@ -19,6 +19,6 @@ class RequireRemoval(Mutator):
             self._add(
                 node=node,
                 original=node.source,
-                replacement="",
+                replacement="true",
                 description=f"Remove {name}",
             )

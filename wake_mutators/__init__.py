@@ -9,3 +9,5 @@ from .less_equal_to_for_greater import LessEqualToForGreater
 from .less_for_greater_equal_to import LessForGreaterEqualTo
 from .boolean_flip import BooleanFlipMutator
 from .require_removal import RequireRemoval
+from .and_for_or_replacement import AndForOrReplacement
+from .or_for_and_replacement import OrForAndReplacement
