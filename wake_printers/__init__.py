@@ -17,3 +17,4 @@ from .modifiers import ModifiersPrinter
 from .state_changes import StateChangesPrinter
 from .storage_layout import StorageLayoutPrinter
 from .tokens import TokensPrinter
+from .mutate_binary_operation import MutateBinaryOperationPrinter
