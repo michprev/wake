@@ -128,7 +128,6 @@ class FileAndPassParamType(click.ParamType):
 @click.option(
     "-r",
     "--shrunk",
-    "--shrank",
     "--reproduce",
     # Didn't use click.Path since we accept relative index of crash log file
     type=str,
