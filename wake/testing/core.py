@@ -25,6 +25,28 @@ from ..development.chain_interfaces import AnvilChainInterface
 from ..development.transactions import TransactionAbc, TransactionStatusEnum
 
 
+_ORIG_ADDRESS_EQ = Address.__eq__
+_ORIG_ACCOUNT_EQ = Account.__eq__
+
+def enable_relaxed_equality_address_account():
+    def _address_eq(self: Address, other: Account | Address) -> bool:
+        if isinstance(other, Account):
+            return _ORIG_ADDRESS_EQ(self, other.address)
+        return _ORIG_ADDRESS_EQ(self, other)
+
+    def _account_eq(self: Account, other: Account | Address) -> bool:
+        if isinstance(other, Address):
+            return _ORIG_ADDRESS_EQ(self.address, other)
+        return _ORIG_ACCOUNT_EQ(self, other)
+
+    Address.__eq__ = _address_eq
+    Account.__eq__ = _account_eq
+
+def disable_relaxed_equality_address_account():
+    Address.__eq__ = _ORIG_ADDRESS_EQ
+    Account.__eq__ = _ORIG_ACCOUNT_EQ
+
+
 class Chain(wake.development.core.Chain):
     _block_gas_limit: int
     _gas_price: Wei
@@ -57,6 +79,11 @@ class Chain(wake.development.core.Chain):
         self, min_gas_price: Optional[int], block_base_fee_per_gas: Optional[int]
     ) -> None:
         connected_chains.append(self)
+
+        if len(connected_chains) == 1: # enable on first chain
+            enable_relaxed_equality_address_account()
+        elif len(connected_chains) == 2: # disable on second chain
+            disable_relaxed_equality_address_account()
 
         self._require_signed_txs = False
         self._gas_price = Wei(0)
