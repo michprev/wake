@@ -982,6 +982,9 @@ class SolidityCompiler:
         incremental: Optional[bool] = None,
         virtual: bool = False,
     ) -> Tuple[ProjectBuild, Set[SolcOutputError]]:
+        # ensure semaphore is bound to the current event loop
+        self.__solc_semaphore = asyncio.Semaphore(os.cpu_count() or 4)
+
         if modified_files is None:
             modified_files = {}
         if deleted_files is None:
