@@ -1778,7 +1778,7 @@ class LspCompiler:
             cu
             for cu in compilation_units
             if (cu.files & files_to_compile)
-            or cu.contains_unresolved_file(self.__deleted_files, self.__config)
+            or cu.contains_unresolved_file(self.__deleted_files, self.__config, None)
         ]
         if len(needed_compilation_units) == 0:
             return len(self.__deleted_files) > 0
