@@ -429,7 +429,12 @@ fn tx_params_access_list_convert<'py>(
             address,
             storage_keys: storage_keys
                 .iter()
-                .map(|key| B256::from_slice(&key.to_bytes_le()))
+                .map(|key| {
+                    let bytes = key.to_bytes_be();
+                    let mut padded = [0u8; 32];
+                    padded[32 - bytes.len()..].copy_from_slice(&bytes);
+                    B256::from(padded)
+                })
                 .collect(),
         });
     }

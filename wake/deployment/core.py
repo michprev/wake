@@ -300,7 +300,13 @@ class Chain(wake.development.core.Chain):
                 tx_copy.pop("gasPrice", None)
                 tx_copy.pop("maxPriorityFeePerGas", None)
                 tx_copy.pop("maxFeePerGas", None)
-                tx_copy["accessList"] = response["accessList"]
+                converted_access_list = []
+                for entry in response["accessList"]:
+                    converted_access_list.append({
+                        "address": entry["address"],
+                        "storageKeys": [int(k, 16) for k in entry["storageKeys"]],
+                    })
+                tx_copy["accessList"] = converted_access_list
 
                 # gas estimate returned by eth_createAccessList cannot be trusted
                 try:
@@ -316,7 +322,7 @@ class Chain(wake.development.core.Chain):
                 if params.get("accessList") == "auto" or (
                     "accessList" not in params and gas_used <= tx["gas"]
                 ):
-                    tx["accessList"] = response["accessList"]
+                    tx["accessList"] = converted_access_list
                     tx["gas"] = gas_used
 
         return tx
@@ -434,6 +440,12 @@ class Chain(wake.development.core.Chain):
             tx_copy["maxFeePerGas"] = str(tx_copy["maxFeePerGas"])
         if "maxPriorityFeePerGas" in tx_copy:
             tx_copy["maxPriorityFeePerGas"] = str(tx_copy["maxPriorityFeePerGas"])
+        if "accessList" in tx_copy:
+            for entry in tx_copy["accessList"]:
+                entry["storageKeys"] = [
+                    "0x" + k.to_bytes(32, "big").hex()
+                    for k in entry["storageKeys"]
+                ]
 
         if get_verbosity() > 0:
             pprint(tx_copy, console=console, max_string=None)

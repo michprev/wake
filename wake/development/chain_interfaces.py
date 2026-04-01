@@ -95,7 +95,16 @@ class ChainInterfaceAbc(ABC):
             tx["maxFeePerGas"] = hex(transaction["maxFeePerGas"])
         if "accessList" in transaction:
             assert transaction["accessList"] != "auto"
-            tx["accessList"] = transaction["accessList"]
+            encoded_access_list = []
+            for entry in transaction["accessList"]:
+                encoded_access_list.append({
+                    "address": entry["address"],
+                    "storageKeys": [
+                        "0x" + k.to_bytes(32, "big").hex()
+                        for k in entry["storageKeys"]
+                    ],
+                })
+            tx["accessList"] = encoded_access_list
         if "authorizationList" in transaction:
             tx["authorizationList"] = [
                 {
