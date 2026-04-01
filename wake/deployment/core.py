@@ -441,11 +441,16 @@ class Chain(wake.development.core.Chain):
         if "maxPriorityFeePerGas" in tx_copy:
             tx_copy["maxPriorityFeePerGas"] = str(tx_copy["maxPriorityFeePerGas"])
         if "accessList" in tx_copy:
-            for entry in tx_copy["accessList"]:
-                entry["storageKeys"] = [
-                    "0x" + k.to_bytes(32, "big").hex()
-                    for k in entry["storageKeys"]
-                ]
+            tx_copy["accessList"] = [
+                {
+                    "address": entry["address"],
+                    "storageKeys": [
+                        "0x" + k.to_bytes(32, "big").hex()
+                        for k in entry["storageKeys"]
+                    ],
+                }
+                for entry in tx_copy["accessList"]
+            ]
 
         if get_verbosity() > 0:
             pprint(tx_copy, console=console, max_string=None)
